@@ -1,10 +1,13 @@
 package com.teste.autoflex.service;
 
+import com.teste.autoflex.dto.product.ProductProductionDTO;
 import com.teste.autoflex.dto.product.ProductRequestDTO;
 import com.teste.autoflex.dto.product.ProductResponseDTO;
+import com.teste.autoflex.dto.product.ProductionResult;
 import com.teste.autoflex.dto.raw_material.RawMaterialItemDTO;
 import com.teste.autoflex.exceptions.BusinessException;
 import com.teste.autoflex.model.Product;
+import com.teste.autoflex.model.ProductRawMaterial;
 import com.teste.autoflex.model.RawMaterial;
 import com.teste.autoflex.repository.ProductRepository;
 import com.teste.autoflex.repository.RawMaterialRepository;
@@ -13,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -94,7 +100,65 @@ public class ProductService {
                 .toList();
     }
 
-    public void quantityProductsToProduce(){
+    public ProductionResult quantityProductsToProduce() {
 
+        var rawMaterials = rawMaterialRepository.findAll();
+        var products = productRepository.getProductsHighValue();
+
+        Map<Long, Integer> virtualStock = new HashMap<>();
+        List<ProductProductionDTO> productions = new ArrayList<>();
+
+        BigDecimal totalValue = BigDecimal.ZERO;
+
+        for (RawMaterial rawMaterial : rawMaterials) {
+            virtualStock.put(rawMaterial.getCode(), rawMaterial.getStockQuantity());
+        }
+
+        for (Product product : products) {
+
+            if (product.getRawMaterials().isEmpty()) {
+                continue;
+            }
+
+            int maxProduction = Integer.MAX_VALUE;
+
+            for (ProductRawMaterial prm : product.getRawMaterials()) {
+                Long rawMaterialCode = prm.getRawMaterial().getCode();
+
+                int available = virtualStock.get(rawMaterialCode);
+                int required = prm.getQuantityRequired();
+
+                int possible = available / required;
+                maxProduction = Math.min(maxProduction, possible);
+            }
+
+            if (maxProduction > 0) {
+
+                for (ProductRawMaterial prm : product.getRawMaterials()) {
+                    Long rawMaterialCode = prm.getRawMaterial().getCode();
+                    int consumed = prm.getQuantityRequired() * maxProduction;
+
+                    virtualStock.put(
+                            rawMaterialCode,
+                            virtualStock.get(rawMaterialCode) - consumed
+                    );
+                }
+
+                productions.add(new ProductProductionDTO(
+                        product.getCode(),
+                        product.getName(),
+                        product.getValue(),
+                        maxProduction
+                ));
+
+                totalValue = totalValue.add(
+                        BigDecimal.valueOf(product.getValue())
+                                .multiply(BigDecimal.valueOf(maxProduction))
+                );
+            }
+        }
+
+        return new ProductionResult(productions, totalValue);
     }
+
 }

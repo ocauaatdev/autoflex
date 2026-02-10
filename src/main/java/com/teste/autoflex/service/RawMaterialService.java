@@ -66,7 +66,10 @@ public class RawMaterialService {
     }
 
     @Transactional(readOnly = true)
-    public List<RawMaterial> getAllRawMaterials() {
-        return repository.findAll();
+    public List<RawMaterialResponseDTO> getAllRawMaterials() {
+        return repository.findAll()
+                .stream()
+                .map(m -> new RawMaterialResponseDTO(m.getCode(), m.getName(), m.getStockQuantity()))
+                .toList();
     }
 }

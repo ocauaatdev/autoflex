@@ -52,4 +52,14 @@ public class ProductController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+    @GetMapping("/production")
+    public ResponseEntity<Object> getQuantityProductsToProduce(){
+        var result = service.quantityProductsToProduce();
+        try {
+            return ResponseEntity.ok().body(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 }
